@@ -1,0 +1,10 @@
+{
+	debug
+	frankenphp
+	frankenphp_queue
+}
+
+localhost {
+	php_server
+}
+
