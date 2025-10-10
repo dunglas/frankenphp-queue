@@ -92,6 +92,16 @@ frankenphp_queue('Hello, Kévin!');
 echo 'Data dispatched to an async worker.';
 ```
 
+## Symfony Messenger Transport
+
+Transport for Symfony Messenger is provided in tests,
+it will be contributed to Symfony when the extension will be more mature.
+
+* [`Caddyfile`](testdata/symfony-messenger/Caddyfile)
+* [`queue-worker.php`](testdata/symfony-messenger/queue-worker.php)
+* [`FrankenPHPQueueTransportFactory`](testdata/symfony-messenger/src/Transport/FrankenPHPQueueTransportFactory.php)
+* [`FrankenPHPQueueTransport`](testdata/symfony-messenger/src/Transport/FrankenPHPQueueTransport.php)
+
 ## Credits
 
 Created by [Kévin Dunglas](https://dunglas.dev) and sponsored by [Les-Tilleuls.coop](https://les-tilleuls.coop).
