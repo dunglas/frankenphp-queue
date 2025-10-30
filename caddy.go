@@ -1,15 +1,22 @@
 package queue
 
 import (
-	"runtime"
+	"log/slog"
 	"strconv"
+	"sync"
 
 	"github.com/caddyserver/caddy/v2"
 	"github.com/caddyserver/caddy/v2/caddyconfig"
 	"github.com/caddyserver/caddy/v2/caddyconfig/caddyfile"
 	"github.com/caddyserver/caddy/v2/caddyconfig/httpcaddyfile"
 	"github.com/dunglas/frankenphp"
-	"go.uber.org/zap"
+	frankenphpCaddy "github.com/dunglas/frankenphp/caddy"
+)
+
+var (
+	worker   frankenphp.Workers
+	logger   *slog.Logger
+	workerMu sync.Mutex
 )
 
 func init() {
@@ -19,12 +26,9 @@ func init() {
 
 type Queue struct {
 	Size       int    `json:"size,omitempty"`
-	MinThreads int    `json:"min_threads,omitempty"`
+	NumThreads int    `json:"numthreads,omitempty"`
 	Name       string `json:"name,omitempty"`
 	Worker     string `json:"worker,omitempty"`
-
-	ctx    caddy.Context
-	logger *zap.Logger
 }
 
 // CaddyModule returns the Caddy module information.
@@ -36,28 +40,22 @@ func (Queue) CaddyModule() caddy.ModuleInfo {
 }
 
 func (g *Queue) Provision(ctx caddy.Context) error {
-	g.logger = ctx.Logger()
-	g.ctx = ctx
-
 	if g.Size <= 0 {
 		g.Size = 10_000
 	}
 
-	if g.MinThreads <= 0 {
-		g.MinThreads = runtime.NumCPU()
+	if g.Name == "" {
+		g.Name = "m#Queue"
 	}
 
 	if g.Worker == "" {
 		g.Worker = "queue-worker.php"
 	}
 
-	w.requestChan = make(chan *frankenphp.WorkerRequest, g.Size)
-	w.minThread = g.MinThreads
-	w.name = g.Name
-	w.filename = g.Worker
-	w.logger = g.logger
-
-	frankenphp.RegisterWorker(w)
+	workerMu.Lock()
+	worker = frankenphpCaddy.RegisterWorkers(g.Name, g.Worker, g.NumThreads)
+	logger = ctx.Slogger()
+	workerMu.Unlock()
 
 	return nil
 }
@@ -89,7 +87,7 @@ func (g *Queue) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 					return d.Errf("failed to parse size: %v", err)
 				}
 				g.Size = s
-			case "min_threads":
+			case "num":
 				if !d.NextArg() {
 					return d.ArgErr()
 				}
@@ -98,7 +96,7 @@ func (g *Queue) UnmarshalCaddyfile(d *caddyfile.Dispenser) error {
 				if err != nil {
 					return d.Errf("failed to parse min_threads: %v", err)
 				}
-				g.MinThreads = t
+				g.NumThreads = t
 			default:
 				return d.Errf(`unrecognized subdirective "%s"`, d.Val())
 			}
